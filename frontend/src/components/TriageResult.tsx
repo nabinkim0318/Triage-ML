@@ -1,0 +1,1 @@
+// Displays triage score and give explanation from LLM
