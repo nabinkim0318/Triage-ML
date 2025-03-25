@@ -1,0 +1,1 @@
+// Enter in patient name, DOB, vitals, and symptoms to submit
