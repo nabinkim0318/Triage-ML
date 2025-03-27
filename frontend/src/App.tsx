@@ -13,6 +13,8 @@ const App: React.FC = () => {
   const [inputKey, setInputKey] = useState(0);
 
   const handleTriageCalculation = (data: any) => {
+    console.log("Received form data:", data);
+
     // Simulated API calls for fetching medical history and triage score
     const fetchedPatientInfo = { conditions: "Hypertension, Deez, Deez asdjdhwaodhaidhwaiodhwai", medications: "Aspirin" }; // Placeholder
     const calculatedScore = "3";
@@ -34,7 +36,7 @@ const App: React.FC = () => {
     setTriageScore("");
     setTriageExplanation("");
     setShowResults(false);
-    setInputKey(prevKey => prevKey + 1); // Reset form by changing key
+    setInputKey(prevKey => prevKey + 1);
   };
 
   return (
@@ -43,12 +45,6 @@ const App: React.FC = () => {
       <div className={`flex ${showResults ? 'flex-row' : 'flex-col'} w-full justify-center items-center gap-8`}>
         <div className="w-1/2 flex flex-col gap-4">
           <PatientInputForm key={inputKey} onSubmit={handleTriageCalculation} />
-          <button
-            onClick={() => handleTriageCalculation({})}
-            className="mt-4 p-2 bg-blue-500 text-white rounded-md w-full"
-          >
-            Calculate Triage Score
-          </button>
           {showResults && <PatientMedicalHistory data={patientInfo} />}
         </div>
         {showResults && (
