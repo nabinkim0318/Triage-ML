@@ -16,9 +16,21 @@ const App: React.FC = () => {
     console.log("Received form data:", data);
 
     // Simulated API calls for fetching medical history and triage score
-    const fetchedPatientInfo = { conditions: "Hypertension, Deez, Deez asdjdhwaodhaidhwaiodhwai", medications: "Aspirin" }; // Placeholder
-    const calculatedScore = "3";
-    const explanation = "AHHHHHHHHHH OHNOOOOOOO";
+    const fetchedPatientInfo = {
+      conditions: "Type 2 Diabetes, Hypertension, Hyperlipidemia, History of Myocardial Infarction",
+      medications: "Metformin 500mg BID, Lisinopril 10mg QD, Atorvastatin 20mg QHS, Aspirin 81mg QD",
+      allergies: "Penicillin (rash), Latex",
+      recentVisits: [
+        "2024-12-02: ER visit for chest tightness and shortness of breath",
+        "2024-10-18: Primary care follow-up – blood pressure uncontrolled",
+        "2024-09-10: Routine annual physical"
+      ],
+      familyHistory: "Father had coronary artery disease and died of MI at age 54",
+      socialHistory: "Former smoker (quit 2 years ago), occasional alcohol, sedentary lifestyle",
+      primaryCareProvider: "Dr. Susan Yang, Internal Medicine"
+    };
+    const calculatedScore = "2";
+    const explanation = "Patient assigned ESI Level 2 due to chest pain, shortness of breath, and a history of myocardial infarction and hypertension—indicating high cardiac risk. Immediate attention recommended despite stable vitals to prevent deterioration.";
     
     setPatientInfo(fetchedPatientInfo);
     setTriageScore(calculatedScore);
@@ -40,15 +52,15 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 h-screen flex flex-col justify-center items-center">
-      <h1 className="text-2xl font-bold mb-4">ER Triage Assistant</h1>
+    <div className="max-w-7xl mx-auto p-6 h-screen flex flex-col justify-center items-center">
       <div className={`flex ${showResults ? 'flex-row' : 'flex-col'} w-full justify-center items-center gap-8`}>
-        <div className="w-1/2 flex flex-col gap-4">
+        <div className="w-2/5 flex flex-col gap-4 items-center">
+          <h1 className="text-2xl font-bold mb-4">ER Triage Assistant</h1>
           <PatientInputForm key={inputKey} onSubmit={handleTriageCalculation} />
-          {showResults && <PatientMedicalHistory data={patientInfo} />}
         </div>
         {showResults && (
-          <div className="w-1/2 flex flex-col gap-4">
+          <div className="w-3/5 flex flex-col">
+            <PatientMedicalHistory data={patientInfo} />
             <TriageResult score={"Level " + triageScore} explanation={triageExplanation} />
             <OverrideTriage onOverride={handleOverride} />
             <SubmitButton onSubmit={handleSubmit} />
