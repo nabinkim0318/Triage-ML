@@ -26,8 +26,7 @@ const App: React.FC = () => {
         "2024-09-10: Routine annual physical"
       ],
       familyHistory: "Father had coronary artery disease and died of MI at age 54",
-      socialHistory: "Former smoker (quit 2 years ago), occasional alcohol, sedentary lifestyle",
-      primaryCareProvider: "Dr. Susan Yang, Internal Medicine"
+      socialHistory: "Former smoker (quit 2 years ago), occasional alcohol, sedentary lifestyle"
     };
     const calculatedScore = "2";
     const explanation = "Patient assigned ESI Level 2 due to chest pain, shortness of breath, and a history of myocardial infarction and hypertension—indicating high cardiac risk. Immediate attention recommended despite stable vitals to prevent deterioration.";
