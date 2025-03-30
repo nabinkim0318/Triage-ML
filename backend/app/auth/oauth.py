@@ -6,7 +6,7 @@ from app.config.settings import settings
 class SMARTAuth:
     def __init__(self):
         self.client_id = settings.CLIENT_ID
-        self.redirect_uri = settings.REDIRECT_URI
+        self.redirect_uri = f"{settings.BASE_URL}/auth/callback"
         self.fhir_base_url = settings.FHIR_SERVER_URL
         
         self.auth_endpoint = settings.AUTH_SERVER_URL

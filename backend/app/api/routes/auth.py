@@ -47,6 +47,7 @@ async def callback(code: str = None, state: str = None, error: str = None):
 
 @router.get("/launch")
 async def launch(iss: str = None, launch: str = None):
+    """Handle launch context for SMART on FHIR"""
     if not iss or not launch:
         raise HTTPException(status_code=400, detail="Missing iss or launch parameters")
     
