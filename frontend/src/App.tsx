@@ -5,6 +5,8 @@ import TriageResult from "./components/TriageResult";
 import OverrideTriage from "./components/OverrideTriage";
 import SubmitButton from "./components/SubmitButton";
 
+import { fetchMedicalHistory } from "./api/fetchMedicalHistory";
+
 const App: React.FC = () => {
   const [patientInfo, setPatientInfo] = useState<{ conditions: string; medications: string } | null>(null);
   const [triageScore, setTriageScore] = useState("");
@@ -12,22 +14,9 @@ const App: React.FC = () => {
   const [showResults, setShowResults] = useState(false);
   const [inputKey, setInputKey] = useState(0);
 
-  const handleTriageCalculation = (data: any) => {
-    console.log("Received form data:", data);
+  const handleTriageCalculation = async (data: any) => {
+    const fetchedPatientInfo = await fetchMedicalHistory("5ee05359-57bf-4cee-8e89-91382c07e162");
 
-    // Simulated API calls for fetching medical history and triage score
-    const fetchedPatientInfo = {
-      conditions: "Type 2 Diabetes, Hypertension, Hyperlipidemia, History of Myocardial Infarction",
-      medications: "Metformin 500mg BID, Lisinopril 10mg QD, Atorvastatin 20mg QHS, Aspirin 81mg QD",
-      allergies: "Penicillin (rash), Latex",
-      recentVisits: [
-        "2024-12-02: ER visit for chest tightness and shortness of breath",
-        "2024-10-18: Primary care follow-up – blood pressure uncontrolled",
-        "2024-09-10: Routine annual physical"
-      ],
-      familyHistory: "Father had coronary artery disease and died of MI at age 54",
-      socialHistory: "Former smoker (quit 2 years ago), occasional alcohol, sedentary lifestyle"
-    };
     const calculatedScore = "2";
     const explanation = "Patient assigned ESI Level 2 due to chest pain, shortness of breath, and a history of myocardial infarction and hypertension—indicating high cardiac risk. Immediate attention recommended despite stable vitals to prevent deterioration.";
     
