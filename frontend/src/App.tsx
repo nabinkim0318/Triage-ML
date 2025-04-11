@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [inputKey, setInputKey] = useState(0);
 
   const handleTriageCalculation = async (data: any) => {
-    const fetchedPatientInfo = await fetchMedicalHistory("5ee05359-57bf-4cee-8e89-91382c07e162");
+    const fetchedPatientInfo = await fetchMedicalHistory(data.firstName, data.lastName, data.dob);
 
     const calculatedScore = "2";
     const explanation = "Patient assigned ESI Level 2 due to chest pain, shortness of breath, and a history of myocardial infarction and hypertension—indicating high cardiac risk. Immediate attention recommended despite stable vitals to prevent deterioration.";
