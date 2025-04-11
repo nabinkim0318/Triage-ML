@@ -49,6 +49,14 @@ class FHIRService:
                     status_code=503, 
                     detail=f"FHIR server connection error: {str(e)}"
                 )
+                
+    async def get_resources(self, resource_type: str, params: dict) -> dict:
+        """Generic fetch for a resource type with query parameters."""
+        from urllib.parse import urlencode
+        query_string = urlencode(params)
+        url = f"{self.base_url}/{resource_type}?{query_string}"
+        return await self._make_request("GET", url)
+
     
     async def get_patient(self, patient_id):
         url = f"{self.base_url}/Patient/{patient_id}"
@@ -202,6 +210,29 @@ class FHIRService:
         return {
             "document_references": doc_references,
             "diagnostic_reports": diagnostic_reports
+        }
+        
+    async def get_encounters(self, patient_id):
+        url = f"{self.base_url}/Encounter?patient={patient_id}&_sort=-date"
+        encounters_data = await self._make_request("GET", url)
+
+        processed_encounters = []
+        if "entry" in encounters_data:
+            for entry in encounters_data["entry"]:
+                enc = entry.get("resource", {})
+                processed_encounters.append({
+                    "id": enc.get("id"),
+                    "status": enc.get("status"),
+                    "class": enc.get("class", {}).get("code"),
+                    "type": [t.get("text") for t in enc.get("type", [])],
+                    "reasonCode": [r.get("text") for r in enc.get("reasonCode", [])],
+                    "period": enc.get("period", {}),
+                    "serviceProvider": enc.get("serviceProvider", {}).get("display")
+                })
+
+        return {
+            "encounters": processed_encounters,
+            "total": len(processed_encounters)
         }
     
     def _extract_name(self, names):

@@ -3,16 +3,17 @@ from app.services.fhir_service import FHIRService
 from app.config.settings import settings
 from typing import Optional
 import logging
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 async def get_fhir_service(authorization: Optional[str] = Header(None)):
     """Dependency to inject FHIR service with authentication"""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Valid authorization token required")
-    
-    token = authorization.replace("Bearer ", "")
+    token = os.getenv("TEST_ACCESS_TOKEN")
     return FHIRService(settings.FHIR_SERVER_URL, token)
 
 @router.get("/{patient_id}")
@@ -22,6 +23,36 @@ async def get_patient(
 ):
     """Get patient details by ID"""
     return await fhir_service.get_patient(patient_id)
+
+@router.get("/{patient_id}/medical-history")
+async def get_medical_history(
+    patient_id: str, 
+    fhir_service: FHIRService = Depends(get_fhir_service)
+):
+    """Retrieve structured medical history for a given patient."""
+    try:
+        demographics = await fhir_service.get_patient_demographics(patient_id)
+        conditions = await fhir_service.get_conditions(patient_id, clinical_status="active")
+        medications = await fhir_service.get_medications(patient_id)
+        allergies = await fhir_service.get_allergies(patient_id)
+        clinical_notes = await fhir_service.get_clinical_notes(patient_id)
+        encounters = await fhir_service.get_encounters(patient_id)
+
+        return {
+            "age": demographics.get("age"),
+            "gender": demographics.get("gender"),
+            "conditions": conditions,
+            "medications": medications,
+            "allergies": allergies,
+            "clinical_notes": clinical_notes,
+            "encounters": encounters
+        }
+
+    except Exception as e:
+        import traceback
+        logger.error("Error in get_medical_history:\n" + traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error retrieving medical history: {str(e)}")
+
 
 @router.get("/{patient_id}/demographics")
 async def get_patient_demographics(
@@ -83,6 +114,14 @@ async def get_patient_clinical_notes(
 ):
     """Get patient clinical notes"""
     return await fhir_service.get_clinical_notes(patient_id)
+
+@router.get("/{patient_id}/encounters")
+async def get_patient_encounters(
+    patient_id: str,
+    fhir_service: FHIRService = Depends(get_fhir_service)
+):
+    """Get patient encounters"""
+    return await fhir_service.get_encounters(patient_id)
 
 @router.get("/{patient_id}/observations")
 async def get_patient_observations(
