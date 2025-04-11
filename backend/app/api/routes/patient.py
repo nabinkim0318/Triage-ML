@@ -24,12 +24,19 @@ async def get_patient(
     """Get patient details by ID"""
     return await fhir_service.get_patient(patient_id)
 
-@router.get("/{patient_id}/medical-history")
+@router.get("/{firstName}/{lastName}/{dob}/medical-history")
 async def get_medical_history(
-    patient_id: str, 
+    firstName: str, 
+    lastName: str, 
+    dob: str, 
     fhir_service: FHIRService = Depends(get_fhir_service)
 ):
     """Retrieve structured medical history for a given patient."""
+    patient_id = await fhir_service.find_patient_id(firstName, lastName, dob)
+    # TODO: If patient not found, no need to retrieve FHIR data, just send vitals only to LLM
+    if not patient_id:
+        raise HTTPException(status_code=404, detail="Patient not found with given name and birthdate")
+
     try:
         demographics = await fhir_service.get_patient_demographics(patient_id)
         conditions = await fhir_service.get_conditions(patient_id, clinical_status="active")
@@ -39,6 +46,8 @@ async def get_medical_history(
         encounters = await fhir_service.get_encounters(patient_id)
 
         return {
+            "name": demographics.get("name"),
+            "birthDate": demographics.get("birthDate"),
             "age": demographics.get("age"),
             "gender": demographics.get("gender"),
             "conditions": conditions,

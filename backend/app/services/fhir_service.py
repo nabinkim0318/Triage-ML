@@ -2,6 +2,7 @@ import httpx
 from fastapi import HTTPException
 import logging
 from typing import Optional, List, Dict, Any
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,21 @@ class FHIRService:
         query_string = urlencode(params)
         url = f"{self.base_url}/{resource_type}?{query_string}"
         return await self._make_request("GET", url)
+    
+    async def find_patient_id(self, first_name: str, last_name: str, birthdate: str):
+        """Search for a patient by first name, last name, and DOB (YYYY-MM-DD)."""
+        params = {
+            "given": first_name,
+            "family": last_name,
+            "birthdate": birthdate
+        }
+        results = await self.get_resources("Patient", params)
+        
+        if "entry" in results and results["entry"]:
+            # Return first match's ID
+            return results["entry"][0]["resource"]["id"]
+        else:
+            return None
 
     
     async def get_patient(self, patient_id):
@@ -129,9 +145,7 @@ class FHIRService:
                 condition = entry.get("resource", {})
                 
                 processed_condition = {
-                    "id": condition.get("id"),
                     "code": self._extract_coding(condition.get("code", {})),
-                    "category": self._extract_coding(condition.get("category", [{}])[0] if condition.get("category") else {}),
                     "clinicalStatus": self._extract_coding(condition.get("clinicalStatus", {})),
                     "verificationStatus": self._extract_coding(condition.get("verificationStatus", {})),
                     "severity": self._extract_coding(condition.get("severity", {})),
@@ -216,18 +230,32 @@ class FHIRService:
         url = f"{self.base_url}/Encounter?patient={patient_id}&_sort=-date"
         encounters_data = await self._make_request("GET", url)
 
+        today = datetime.date.today()
+        ten_years_ago = today.replace(year=today.year - 10)
+
         processed_encounters = []
         if "entry" in encounters_data:
             for entry in encounters_data["entry"]:
                 enc = entry.get("resource", {})
+                period = enc.get("period", {})
+                start_str = period.get("start")
+                # Only get encounters from within the last 10 years
+                if not start_str:
+                    continue
+
+                try:
+                    start_date = datetime.datetime.fromisoformat(start_str[:10]).date()
+                    if start_date < ten_years_ago:
+                        continue
+                except ValueError:
+                    continue
+                
                 processed_encounters.append({
-                    "id": enc.get("id"),
                     "status": enc.get("status"),
                     "class": enc.get("class", {}).get("code"),
                     "type": [t.get("text") for t in enc.get("type", [])],
                     "reasonCode": [r.get("text") for r in enc.get("reasonCode", [])],
                     "period": enc.get("period", {}),
-                    "serviceProvider": enc.get("serviceProvider", {}).get("display")
                 })
 
         return {
@@ -312,7 +340,6 @@ class FHIRService:
             for coding in coded_concept["coding"]:
                 result["code"] = coding.get("code", "")
                 result["display"] = coding.get("display", "")
-                result["system"] = coding.get("system", "")
                 break
                 
         return result
@@ -398,7 +425,7 @@ class FHIRService:
             
             for entry in medications_data["entry"]:
                 resource = entry.get("resource", {})
-                if resource.get("resourceType") == resource_type:
+                if resource.get("resourceType") == resource_type and resource.get("status", "").lower() == "active":
                     med_request = resource
                     
                     medication_info = {}
@@ -432,17 +459,10 @@ class FHIRService:
                             dosage_info.append(dosage_data)
                     
                     processed_med = {
-                        "id": med_request.get("id"),
                         "status": med_request.get("status"),
                         "medication": medication_info,
                         "dosage": dosage_info,
-                        "authoredOn": med_request.get("authoredOn"),
                     }
-                    
-                    if is_request:
-                        processed_med["intent"] = med_request.get("intent")
-                        if "requester" in med_request:
-                            processed_med["requester"] = med_request["requester"].get("display", "")
                             
                     processed_medications.append(processed_med)
         
