@@ -5,6 +5,7 @@ from typing import Optional
 import logging
 import os
 from dotenv import load_dotenv
+from app.api.routes.auth import token_store
 
 load_dotenv()
 
@@ -13,7 +14,10 @@ router = APIRouter()
 
 async def get_fhir_service(authorization: Optional[str] = Header(None)):
     """Dependency to inject FHIR service with authentication"""
-    token = os.getenv("TEST_ACCESS_TOKEN")
+    # token = os.getenv("TEST_ACCESS_TOKEN")
+    token = token_store.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="No valid access token available. Please authenticate.")
     return FHIRService(settings.FHIR_SERVER_URL, token)
 
 @router.get("/{patient_id}")
