@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+if os.path.exists(".env"):
+    load_dotenv()
 
 class Settings:
     API_V1_STR: str = "/api/v1"
@@ -16,6 +17,8 @@ class Settings:
     AUTH_SERVER_URL: str = os.getenv("AUTH_SERVER_URL")
     TOKEN_SERVER_URL: str = os.getenv("TOKEN_SERVER_URL")
 
-    DEBUG: bool = False
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://triage-ml.vercel.app/")
+
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
 settings = Settings()

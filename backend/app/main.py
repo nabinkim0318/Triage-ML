@@ -5,6 +5,7 @@ from app.api.routes import auth, patient
 from app.config.settings import settings
 from app.api.middleware.error_handler import error_handler_middleware
 from app.utils.logging_config import setup_logging
+import os
 
 setup_logging(debug=settings.DEBUG)
 
@@ -19,7 +20,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        settings.FRONTEND_URL,
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,4 +66,5 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=settings.DEBUG)

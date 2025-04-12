@@ -12,28 +12,31 @@ def setup_logging(debug=False):
         format=log_format,
     )
     
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
+    try:
+        if not os.path.exists('logs'):
+            os.makedirs('logs')
     
-    file_handler = RotatingFileHandler(
-        'logs/app.log', 
-        maxBytes=10485760,  # 10MB
-        backupCount=10
-    )
-    file_handler.setFormatter(logging.Formatter(log_format))
-    file_handler.setLevel(log_level)
-    
-    error_handler = RotatingFileHandler(
-        'logs/error.log', 
-        maxBytes=10485760,
-        backupCount=10
-    )
-    error_handler.setFormatter(logging.Formatter(log_format))
-    error_handler.setLevel(logging.ERROR)
-    
-    root_logger = logging.getLogger()
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(error_handler)
+        file_handler = RotatingFileHandler(
+            'logs/app.log', 
+            maxBytes=10485760,  # 10MB
+            backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(log_format))
+        file_handler.setLevel(log_level)
+        
+        error_handler = RotatingFileHandler(
+            'logs/error.log', 
+            maxBytes=10485760,
+            backupCount=10
+        )
+        error_handler.setFormatter(logging.Formatter(log_format))
+        error_handler.setLevel(logging.ERROR)
+        
+        root_logger = logging.getLogger()
+        root_logger.addHandler(file_handler)
+        root_logger.addHandler(error_handler)
+    except (IOError, PermissionError):
+        print("Warning: Unable to create log files. Using console logging only.")
     
     logging.getLogger('httpx').setLevel(logging.WARNING)
     logging.getLogger('uvicorn').setLevel(logging.WARNING)
