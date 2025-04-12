@@ -3,10 +3,12 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from app.auth.oauth import SMARTAuth
+from typing import Dict
+import logging
 
 router = APIRouter()
 smart_auth = SMARTAuth()
-
+logger = logging.getLogger(__name__)
 states = {}
 
 @router.get("/login")
@@ -18,6 +20,8 @@ async def login():
     auth_url = smart_auth.get_authorization_url(state)
     
     return RedirectResponse(auth_url)
+
+token_store: Dict[str, dict] = {}
 
 @router.get("/callback")
 async def callback(code: str = None, state: str = None, error: str = None):
@@ -34,7 +38,10 @@ async def callback(code: str = None, state: str = None, error: str = None):
     del states[state]
     
     token_response = await smart_auth.exchange_code_for_token(code)
-    
+    token_store["access_token"] = token_response.get("access_token")
+    token_store["expires_in"] = token_response.get("expires_in")
+    token_store["refresh_token"] = token_response.get("refresh_token")
+        
     return {
         "access_token": token_response.get("access_token"),
         "token_type": token_response.get("token_type", "Bearer"),
