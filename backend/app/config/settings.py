@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 
+
 if os.path.exists(".env"):
     load_dotenv()
 
@@ -20,5 +21,7 @@ class Settings:
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://triage-ml.vercel.app/")
 
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
 settings = Settings()
+print(settings.OPENAI_API_KEY)

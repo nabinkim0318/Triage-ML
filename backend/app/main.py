@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from app.api.routes import llm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from app.api.routes import auth, patient
@@ -36,6 +37,12 @@ app.include_router(
     patient.router, 
     prefix=f"{settings.API_V1_STR}/patient", 
     tags=["patient"]
+)
+
+app.include_router(
+    llm.router,
+    prefix=f"{settings.API_V1_STR}/llm",  
+    tags=["llm"]
 )
 
 @app.get("/docs", include_in_schema=False)
