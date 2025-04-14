@@ -1,5 +1,7 @@
+import { API_BASE_URL  } from "../config";
+
 export const fetchMedicalHistory = async (firstName:string, lastName:string, dob:string) => {
-    const response = await fetch(`http://localhost:8000/api/v1/patient/${firstName}/${lastName}/${dob}/medical-history`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/patient/${firstName}/${lastName}/${dob}/medical-history`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
