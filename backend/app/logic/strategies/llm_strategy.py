@@ -1,5 +1,4 @@
 import json
-from openai import OpenAI
 from app.schemas.triage import LLMRequest
 from app.logic.strategies.base import TriageScoringStrategy
 from app.config.settings import settings
@@ -7,18 +6,6 @@ import httpx
 
 
 print("🧪 OPENAI_API_KEY:", settings.OPENAI_API_KEY)
-
-
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=settings.OPENAI_API_KEY,
-    default_headers={
-        "Authorization": f"Bearer {settings.OPENAI_API_KEY}",  
-        "HTTP-Referer": "http://localhost:8000",              
-        "X-Title": "triage-llm-dev",
-        "Content-Type": "application/json"                           
-    }
-)
 
 class LLMScoringStrategy(TriageScoringStrategy):
     async def score(self, data: LLMRequest) -> dict:
@@ -32,13 +19,18 @@ class LLMScoringStrategy(TriageScoringStrategy):
         }
 
         payload = {
-            "model": "openrouter/mistralai/mistral-7b-instruct",
+            "model": "mistralai/mistral-7b-instruct",  
             "messages": [
                 {"role": "system", "content": "You are a medical triage assistant."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.3
         }
+
+        # 🔍 DEBUG 로그 출력
+        print("📦 [디버그] API KEY:", settings.OPENAI_API_KEY)
+        print("📦 [디버그] Headers:", headers)
+        print("📦 [디버그] Payload:", json.dumps(payload, indent=2))
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -47,11 +39,23 @@ class LLMScoringStrategy(TriageScoringStrategy):
                 json=payload
             )
 
+        print("📨 [디버그] 응답 상태코드:", response.status_code)
+        print("📨 [디버그] 응답 본문:", response.text)
+
         if response.status_code != 200:
             raise Exception(f"OpenRouter API error {response.status_code}: {response.text}")
 
         content = response.json()["choices"][0]["message"]["content"]
-        return json.loads(content)
+
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            parsed = {
+                "esi_score": 3,
+                "explanation": content.strip()
+            }
+
+        return parsed
 
     def build_prompt(self, data: LLMRequest) -> str:
         return f"""You are a triage assistant. Based on the following data, assign an ESI level (1–5) and explain.
