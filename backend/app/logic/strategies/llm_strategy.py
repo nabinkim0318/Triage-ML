@@ -58,19 +58,23 @@ class LLMScoringStrategy(TriageScoringStrategy):
         return parsed
 
     def build_prompt(self, data: LLMRequest) -> str:
-        return f"""You are a triage assistant. Based on the following data, assign an ESI level (1–5) and explain.
+        return f"""You are a triage assistant. Based on the following FHIR and patient data, assign an Emergency Severity Index level (1-5) and give a short 50-100 word-long explanation. Level 1 is life-threatening, level 5 is non-urgent. Please take the patient's vitals, symptoms, and medical information as context to calculate the score. Also use recent and relevant encounters for context on if the patient is visiting the ER for a recurring issue.
 
 Patient:
-- Age: {data.age}
+- Age: {"N/A" if data.age is -1 else data.age}
 - Gender: {data.gender}
-- Symptoms: {data.symptoms}
+- Symptoms: {data.symptoms or "N/A"}
 - Vitals:
-    - Heart Rate: {data.vitals.get("heartRate", "N/A")}
-    - Blood Pressure: {data.vitals.get("bloodPressureSystolic", "N/A")}/{data.vitals.get("bloodPressureDiastolic", "N/A")}
-    - Temperature: {data.vitals.get("temperature", "N/A")}
-    - Respiratory Rate: {data.vitals.get("respiratoryRate", "N/A")}
-    - Oxygen Saturation: {data.vitals.get("oxygenSaturation", "N/A")}
+    - Heart Rate: {data.vitals.get("heartRate", "N/A")} bpm
+    - Blood Pressure: {data.vitals.get("bloodPressureSystolic", "N/A")}/{data.vitals.get("bloodPressureDiastolic", "N/A")} mmHg
+    - Temperature: {data.vitals.get("temperature", "N/A")} {data.vitals.get("temperatureUnit", "N/A")}
+    - Respiratory Rate: {data.vitals.get("respiratoryRate", "N/A")} breaths/min
+    - Oxygen Saturation: {data.vitals.get("oxygenSaturation", "N/A")} %
 - Chronic Conditions: {", ".join(data.conditions) or "None"}
+- Medications: {", ".join([med.name for med in data.medications]) or "None"}
+- Allergies: {", ".join([allergy.name for allergy in data.allergies]) or "None"}
+- Clinical Notes: {", ".join([f"{note.type} ({note.date})" for note in data.clinical_notes]) or "None"}
+- Encounters: {", ".join([f"{', '.join(enc.type)}. Encounter class: {enc.class_}. Reason for visit: {enc.reason} (Encounter start: {enc.period.get('start', 'Unknown')} - Encounter end: {enc.period.get('end', 'Unknown')})" for enc in data.encounters]) or "None"}
 
 Respond in JSON:
 {{

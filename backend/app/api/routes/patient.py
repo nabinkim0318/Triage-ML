@@ -3,9 +3,13 @@ from app.services.fhir_service import FHIRService
 from app.config.settings import settings
 from typing import Optional
 import logging
-import os
 from dotenv import load_dotenv
 from app.api.routes.auth import token_store
+from pydantic import BaseModel
+from typing import Optional, Dict
+from app.logic.scorer import TriageScorer
+from app.schemas.triage import LLMRequest
+from datetime import datetime
 
 load_dotenv()
 
@@ -28,37 +32,162 @@ async def get_patient(
     """Get patient details by ID"""
     return await fhir_service.get_patient(patient_id)
 
-@router.get("/{firstName}/{lastName}/{dob}/medical-history")
+class MedicalHistoryRequest(BaseModel):
+    firstName: str
+    lastName: str
+    dob: str
+    symptoms: Optional[str] = None
+    vitals: Optional[Dict[str, str]] = None
+    
+def calculate_age(birth_date: str) -> int:
+    """Calculate age based on the date of birth."""
+    try:
+        birth_date = datetime.strptime(birth_date, "%Y-%m-%d")
+        today = datetime.today()
+        age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+        return age
+    except ValueError:
+        return -1  # Return -1 if the date format is invalid
+
+@router.post("/medical-history")
 async def get_medical_history(
-    firstName: str, 
-    lastName: str, 
-    dob: str, 
+    request: MedicalHistoryRequest,
     fhir_service: FHIRService = Depends(get_fhir_service)
 ):
     """Retrieve structured medical history for a given patient."""
-    patient_id = await fhir_service.find_patient_id(firstName, lastName, dob)
-    # TODO: If patient not found, no need to retrieve FHIR data, just send vitals only to LLM
+    age = calculate_age(request.dob)
+    
+    patient_id = await fhir_service.find_patient_id(request.firstName, request.lastName, request.dob)
     if not patient_id:
-        raise HTTPException(status_code=404, detail="Patient not found with given name and birthdate")
+        llm_request_data = {
+            "age": age if age >= 0 else -1,
+            "gender": "N/A",
+            "symptoms": request.symptoms or "N/A",
+            "vitals": {
+                "heartRate": request.vitals.get("heartRate", "N/A") or "N/A",
+                "bloodPressureSystolic": request.vitals.get("bloodPressureSystolic", "N/A") or "N/A",
+                "bloodPressureDiastolic": request.vitals.get("bloodPressureDiastolic", "N/A") or "N/A",
+                "temperature": request.vitals.get("temperature", "N/A") or "N/A",
+                "temperatureUnit": request.vitals.get("temperatureUnit", "N/A") or "N/A",
+                "respiratoryRate": request.vitals.get("respiratoryRate", "N/A") or "N/A",
+                "oxygenSaturation": request.vitals.get("oxygenSaturation", "N/A") or "N/A",
+            },
+            "conditions": [],
+            "medications": [],
+            "allergies": [],
+            "clinical_notes": [],
+            "encounters": [],
+        }
+
+        scorer = TriageScorer(strategy="llm")
+        llm_response = await scorer.predict(LLMRequest(**llm_request_data))
+
+        return {
+            "name": f"{request.firstName} {request.lastName}",
+            "birthDate": request.dob,
+            "age": age if age >= 0 else None,
+            "gender": None,
+            "conditions": [],
+            "medications": [],
+            "allergies": [],
+            "clinical_notes": [],
+            "encounters": [],
+            "triage_score": llm_response["esi_score"],
+            "triage_explanation": llm_response["explanation"],
+        }
 
     try:
+        # Retrieve FHIR data
         demographics = await fhir_service.get_patient_demographics(patient_id)
         conditions = await fhir_service.get_conditions(patient_id, clinical_status="active")
         medications = await fhir_service.get_medications(patient_id)
         allergies = await fhir_service.get_allergies(patient_id)
-        clinical_notes = await fhir_service.get_clinical_notes(patient_id)
+        clinical_notes = await fhir_service.get_clinical_notes(patient_id, fetch_content=True)
         encounters = await fhir_service.get_encounters(patient_id)
+        
+        vitals = {
+            "heartRate": request.vitals.get("heartRate", "N/A") or "N/A",
+            "bloodPressureSystolic": request.vitals.get("bloodPressureSystolic", "N/A") or "N/A",
+            "bloodPressureDiastolic": request.vitals.get("bloodPressureDiastolic", "N/A") or "N/A",
+            "temperature": request.vitals.get("temperature", "N/A") or "N/A",
+            "temperatureUnit": request.vitals.get("temperatureUnit", "N/A") or "N/A",
+            "respiratoryRate": request.vitals.get("respiratoryRate", "N/A") or "N/A",
+            "oxygenSaturation": request.vitals.get("oxygenSaturation", "N/A") or "N/A",
+        }
+        
+        # Prepare data for LLM
+        llm_request_data = {
+            "age": demographics.get("age"),
+            "gender": demographics.get("gender"),
+            "symptoms": request.symptoms,
+            "vitals": vitals,
+            "conditions": [condition["code"]["text"] for condition in conditions.get("conditions", [])],
+            "medications": [
+                {
+                    "name": med["medication"].get("text", "Unknown"),
+                    "dosage": [
+                        {
+                            "text": dosage.get("text", "N/A"),
+                            "timing": dosage.get("timing", {}).get("text", "N/A"),
+                            "route": dosage.get("route", {}).get("text", "N/A"),
+                            "dose": dosage.get("doseAndRate", [{}])[0].get("doseQuantity", {}).get("value", "N/A")
+                        }
+                        for dosage in med.get("dosage", [])
+                    ]
+                }
+                for med in medications.get("medications", [])
+            ],
+            "allergies": [
+                {
+                    "name": allergy["code"].get("text", "Unknown"),
+                    "criticality": allergy.get("criticality", "unknown"),
+                    "reaction": [
+                        {
+                            "manifestation": [reaction.get("manifestation", [{}])[0].get("text", "N/A")],
+                            "severity": reaction.get("severity", "N/A")
+                        }
+                        for reaction in allergy.get("reaction", [])
+                    ]
+                }
+                for allergy in allergies.get("allergies", [])
+            ],
+            "clinical_notes": [
+                {
+                    "type": note.get("type", "Unknown"),
+                    "date": note.get("date", "Unknown"),
+                    "content": note.get("content", "No content available")
+                }
+                for note in clinical_notes.get("notes", [])
+            ],
+            "encounters": [
+                {
+                    "type": [enc_type.get("text", "Unknown") for enc_type in encounter.get("type", [])],
+                    "class_": encounter.get("class", "Unknown"),
+                    "reason": encounter.get("reason", "Unknown"),
+                    "period": {
+                        "start": encounter.get("period", {}).get("start", "Unknown"),
+                        "end": encounter.get("period", {}).get("end", "Unknown")
+                    }
+                }
+                for encounter in encounters.get("encounters", [])
+            ],
+        }
+        # Call the LLM scorer
+        scorer = TriageScorer(strategy="llm")  # Use the LLM scoring strategy
+        llm_response = await scorer.predict(LLMRequest(**llm_request_data))
 
         return {
             "name": demographics.get("name"),
             "birthDate": demographics.get("birthDate"),
-            "age": demographics.get("age"),
+            "age": age if age >= 0 else demographics.get("age"),
             "gender": demographics.get("gender"),
             "conditions": conditions,
             "medications": medications,
             "allergies": allergies,
             "clinical_notes": clinical_notes,
-            "encounters": encounters
+            "encounters": encounters,
+            "triage_score": llm_response["esi_score"],
+            "triage_explanation": llm_response["explanation"],
         }
 
     except Exception as e:

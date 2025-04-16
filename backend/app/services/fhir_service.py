@@ -201,32 +201,44 @@ class FHIRService:
             "allergies": processed_allergies,
             "total": len(processed_allergies)
         }
+        
+    async def get_clinical_notes(self, patient_id: str, fetch_content: bool = False):
+        """Retrieve clinical notes for a patient."""
+        url = f"{self.base_url}/DocumentReference?subject=Patient/{patient_id}"
+        data = await self._make_request("GET", url)
+
+        notes = []
+        async with httpx.AsyncClient() as client:
+            for entry in data.get("entry", []):
+                resource = entry.get("resource", {})
+                note = {
+                    "type": resource.get("type", {}).get("text", "Unknown"),
+                    "date": resource.get("date", "Unknown"),
+                    "content": None,
+                }
+
+                if fetch_content:
+                    # Fetch the actual content of the clinical note
+                    for content in resource.get("content", []):
+                        attachment = content.get("attachment", {})
+                        if "data" in attachment:
+                            import base64
+                            note["content"] = base64.b64decode(attachment["data"]).decode("utf-8")
+                        elif "url" in attachment:
+                            try:
+                                content_response = await client.get(attachment["url"], headers=self._get_headers())
+                                content_response.raise_for_status()
+                                note["content"] = content_response.text
+                            except httpx.RequestError as e:
+                                logger.error(f"Failed to fetch content from URL: {attachment['url']} - {str(e)}")
+                                note["content"] = f"Error fetching content from URL: {str(e)}"
+
+                notes.append(note)
+
+        return {"notes": notes}
     
-    async def get_clinical_notes(self, patient_id):
-        doc_references = await self.get_resources(
-            resource_type="DocumentReference",
-            params={
-                "patient": patient_id,
-                "category": "clinical-note",
-                "_sort": "-date"
-            }
-        )
-        
-        diagnostic_reports = await self.get_resources(
-            resource_type="DiagnosticReport",
-            params={
-                "patient": patient_id,
-                "category": "note",
-                "_sort": "-date"
-            }
-        )
-        
-        return {
-            "document_references": doc_references,
-            "diagnostic_reports": diagnostic_reports
-        }
-        
     async def get_encounters(self, patient_id):
+        """Retrieve encounters for a patient within the last 10 years, including the reason for the encounter."""
         url = f"{self.base_url}/Encounter?patient={patient_id}&_sort=-date"
         encounters_data = await self._make_request("GET", url)
 
@@ -239,6 +251,7 @@ class FHIRService:
                 enc = entry.get("resource", {})
                 period = enc.get("period", {})
                 start_str = period.get("start")
+                
                 # Only get encounters from within the last 10 years
                 if not start_str:
                     continue
@@ -249,13 +262,31 @@ class FHIRService:
                         continue
                 except ValueError:
                     continue
-                
+
+                # Extract type and reasonCode with coding codes
+                encounter_type = [
+                    {
+                        "text": t.get("text", "Unknown"),
+                        "code": t.get("coding", [{}])[0].get("code", "N/A")
+                    }
+                    for t in enc.get("type", [])
+                ]
+
+                # Extract the actual reason for the encounter
+                reason = (
+                    enc.get("reasonCode", [{}])[0]
+                    .get("coding", [{}])[0]
+                    .get("display", "Unknown")
+                )
+
                 processed_encounters.append({
-                    "status": enc.get("status"),
                     "class": enc.get("class", {}).get("code"),
-                    "type": [t.get("text") for t in enc.get("type", [])],
-                    "reasonCode": [r.get("text") for r in enc.get("reasonCode", [])],
-                    "period": enc.get("period", {}),
+                    "type": encounter_type,
+                    "reason": reason,
+                    "period": {
+                        "start": period.get("start", "Unknown"),
+                        "end": period.get("end", "Unknown")
+                    },
                 })
 
         return {
