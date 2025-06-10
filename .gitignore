@@ -6,6 +6,7 @@ dist/
 build/
 
 venv/
+.env
 
 .vscode/
 
@@ -13,3 +14,4 @@ venv/
 *.tmp
 *.swp
 .DS_Store
+.vercel

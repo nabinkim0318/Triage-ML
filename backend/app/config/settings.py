@@ -32,7 +32,7 @@ class Settings:
     AUTH_SERVER_URL: str = os.getenv("AUTH_SERVER_URL")
     TOKEN_SERVER_URL: str = os.getenv("TOKEN_SERVER_URL")
 
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://triage-ml.vercel.app/")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://triage-ml.onrender.com")
 
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
